@@ -46,7 +46,7 @@ func TestBasicExtractBits(t *testing.T) {
 }
 
 func BenchmarkTestGreaterThanBitmap(b *testing.B) {
-	const N = 64
+	const N = 10
 	levels := make([]int16, N)
 	for idx := range levels {
 		levels[idx] = int16(idx)
