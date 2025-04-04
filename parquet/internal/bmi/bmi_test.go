@@ -14,13 +14,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bmi_test
+package bmi
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/apache/arrow-go/v18/parquet/internal/bmi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,7 +40,27 @@ func TestBasicExtractBits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%d-%d=>%d", tt.bitmap, tt.selection, tt.expected), func(t *testing.T) {
-			assert.Equal(t, tt.expected, bmi.ExtractBits(tt.bitmap, tt.selection))
+			assert.Equal(t, tt.expected, ExtractBits(tt.bitmap, tt.selection))
 		})
 	}
+}
+
+func BenchmarkTestGreaterThanBitmap(b *testing.B) {
+	const N = 64
+	levels := make([]int16, N)
+	for idx := range levels {
+		levels[idx] = int16(idx)
+	}
+
+	b.Run("func", func(b *testing.B) {
+		for b.Loop() {
+			GreaterThanBitmap(levels, N/2)
+		}
+	})
+
+	b.Run("no-func-go", func(b *testing.B) {
+		for b.Loop() {
+			greaterThanBitmapGo(levels, N/2)
+		}
+	})
 }

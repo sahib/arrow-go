@@ -19,14 +19,36 @@
 
 package bmi
 
-import "unsafe"
+import (
+	"unsafe"
+
+	"golang.org/x/sys/cpu"
+)
 
 //go:noescape
-func _levels_to_bitmap_neon(levels unsafe.Pointer, numLevels int, rhs int16) (res uint64)
+func _extract_bits_bmi2(bitmap, selectBitmap uint64) (res uint64)
 
-// greaterThanBitmapNEON builds a bitmap where each set bit indicates the corresponding level
+// extractBitsBMI2 uses BMI2 to call the pext instruction, Parallel Bits Extract
+// in order to quickly and efficiently extract the bits selected in a parallel
+// fashion. See the definition of the PEXT instruction for x86/x86-64 cpus
+func ExtractBits(bitmap, selectBitmap uint64) uint64 {
+	if !cpu.X86.HasBMI2 {
+		return extractBitsGo(bitmap, selectBitmap)
+	}
+
+	return _extract_bits_bmi2(bitmap, selectBitmap)
+}
+
+//go:noescape
+func _levels_to_bitmap_bmi2(levels unsafe.Pointer, numLevels int, rhs int16) (res uint64)
+
+// greaterThanBitmapBMI2 builds a bitmap where each set bit indicates the corresponding level
 // is greater than the rhs value.
-func greaterThanBitmapNEON(levels []int16, rhs int16) uint64 {
+func GreaterThanBitmap(levels []int16, rhs int16) uint64 {
+	if !cpu.X86.HasAVX2 {
+		return greaterThanBitmapGo(levels, rhs)
+	}
+
 	if len(levels) == 0 {
 		return 0
 	}
@@ -37,5 +59,5 @@ func greaterThanBitmapNEON(levels []int16, rhs int16) uint64 {
 		p3 = rhs
 	)
 
-	return _levels_to_bitmap_neon(p1, p2, p3)
+	return _levels_to_bitmap_bmi2(p1, p2, p3)
 }

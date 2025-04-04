@@ -23,9 +23,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unsafe"
 
 	"github.com/klauspost/cpuid/v2"
 )
+
+var hasASIMD bool
 
 func init() {
 	// Added ability to enable extension via environment:
@@ -51,14 +54,32 @@ func init() {
 		}
 	}
 
-	// after benchmarking, turns out the pure go lookup table version
-	// is nearly twice as fast as the non-lookup table assembly
-	// because arm doesn't have a PEXT instruction.
-	funclist.extractBits = extractBitsGo
+	hasASIMD = cpuid.CPU.Has(cpuid.ASIMD)
+}
 
-	if cpuid.CPU.Has(cpuid.ASIMD) {
-		funclist.gtbitmap = greaterThanBitmapNEON
-	} else {
-		funclist.gtbitmap = greaterThanBitmapGo
+//go:noescape
+func _levels_to_bitmap_neon(levels unsafe.Pointer, numLevels int, rhs int16) (res uint64)
+
+// greaterThanBitmapNEON builds a bitmap where each set bit indicates the corresponding level
+// is greater than the rhs value.
+func GreaterThanBitmap(levels []int16, rhs int16) uint64 {
+	if !hasASIMD {
+		return greaterThanBitmapGo(levels, rhs)
 	}
+
+	if len(levels) == 0 {
+		return 0
+	}
+
+	var (
+		p1 = unsafe.Pointer(&levels[0])
+		p2 = len(levels)
+		p3 = rhs
+	)
+
+	return _levels_to_bitmap_neon(p1, p2, p3)
+}
+
+func ExtractBits(bitmap, selectBitmap uint64) uint64 {
+	return extractBitsGo(bitmap, selectBitmap)
 }
